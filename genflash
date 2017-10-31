@@ -1,0 +1,42 @@
+echo "script begin $(date +"%Y/%m/%d %H:%M:%S")"
+workspace_root=/media/E/project
+#workspace=$(find $workspace_root/mtk* -maxdepth 2 -type d -name .git -follow | grep mtk)
+workspace=$(cat project_list)
+
+for patch in $workspace;
+do
+{
+	patch=$(dirname $patch)
+	memerypatch=""
+	if [ -d $patch/vendor/mediatek/proprietary/bootable/bootloader/preloader/custom ]
+		then
+		memerypatch="vendor/mediatek/proprietary/bootable/bootloader/preloader/custom"
+	fi
+	if [ -d $patch/bootable/bootloader/preloader/custom ]
+		then
+		memerypatch="bootable/bootloader/preloader/custom"
+	fi
+	if [ -d $patch/mediatek/custom ]
+		then
+		memerypatch="mediatek/custom"
+	fi
+	
+	if [ "$memerypatch"x != x ]
+	then
+	{
+	echo ======================================== >> flash_all.txt
+	echo platform: $patch >> flash_all.txt
+	for file in $(ls $patch/$memerypatch/custom_MemoryDevice.h.* | sort);
+	do
+	{
+		echo $(echo $file | awk -F"custom_MemoryDevice.h." '{print $2}'): >> flash_all.txt
+		cat $file | grep CS_PART_NUMBER | grep -v "\/\/\#" | awk -F' ' '{print $3}'  >> flash_all.txt
+		echo   >> flash_all.txt
+	};
+	done;
+	echo ======================================== >> flash_all.txt
+	};
+	fi
+};
+done;
+echo "script end $(date +"%Y/%m/%d %H:%M:%S")"

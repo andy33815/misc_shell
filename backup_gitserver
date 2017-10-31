@@ -1,0 +1,32 @@
+repertory_path="/D/gitserver/ /E/gitserver2/ /F/gitserver3/"
+save_log=/G/history.txt
+backup_path=/G
+
+rm $save_log.bak > /dev/null 2>&1
+for git_path in $repertory_path;
+do
+{
+	for dir in $(find $git_path -type d -maxdepth 1 -name "*.git" | sort);
+	do
+	{
+		echo $dir
+		cd $dir
+		git_co_hash=$(git log --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+		repertory_name=$(basename $dir)
+		history_hash=$(grep $repertory_name $save_log | awk '{print $2}')
+		if [ "$git_co_hash"x != "$history_hash"x ]; then
+			timestr=$(date +%Y%m%d)
+			rm ${backup_path}/${repertory_name}* > /dev/null 2>&1
+			echo "tar cvpzf ${backup_path}/${repertory_name}_${timestr}.tgz $dir"
+			tar cvpzf ${backup_path}/${repertory_name}_${timestr}.tgz $dir > /dev/null 2>&1
+		else
+			echo "$repertory_name has yet lasted"
+		fi
+		echo "$repertory_name $git_co_hash" >> $save_log.bak
+		cd - > /dev/null 2>&1
+	};
+	done;
+};
+done;
+rm $save_log
+mv ${save_log}.bak ${save_log}

@@ -1,0 +1,12 @@
+workspace=$(find /media/E/project/ -maxdepth 3 -type d -name .git -follow | grep mtk)
+
+for path in $workspace;
+do
+{
+	cd $(dirname $path)
+	echo $(dirname $path)
+	git-gerrit init
+};
+done;
+
+sh /home/$USER/Mail/autosend.sh gerrit_project /media/E/project/

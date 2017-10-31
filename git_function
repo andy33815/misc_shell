@@ -1,0 +1,44 @@
+#!/bin/sh
+# we have only 2 arguments. Print the help text: 
+if [ $# -lt 2 ] ; then 
+printf "USAGE: 
+	$0 XUNHU_OPTION save_path
+EXAMPLE: 
+	find all XUNHU_LPS_AUXILIARYCAMERA_SUPPORT related files, and save to /media/E/patch: 
+	$0 XUNHU_LPS_AUXILIARYCAMERA_SUPPORT /media/E/patch
+HELP 
+"
+exit 0 
+fi
+
+function_option=$1
+patch_save=$2
+git_hash=$(git log --color --graph --date=short --pretty=format:'%h %s' --abbrev-commit --grep=${function_option} | awk '{print $2}')
+echo Option=$function_option 
+echo -e "git hash list is: \n$git_hash"
+test -f temp.txt && rm temp.txt
+last_hash=""
+
+for hash in $git_hash;
+do
+	git show $hash --format=%n --name-only >> temp.txt
+	last_hash=$hash
+done;
+
+filelist=$(cat temp.txt | sort | uniq)
+test -d ${patch_save} || mkdir -p ${patch_save}
+git diff ${last_hash}^ --name-status ${filelist} > ${patch_save}/filelist.txt
+for file in $filelist;
+do
+	test -d ${patch_save}/new/$(dirname $file) || mkdir -p ${patch_save}/new/$(dirname $file)
+	cp $file ${patch_save}/new/$file
+	filestatus=$(git diff ${last_hash}^ --name-status $file | awk '{print $1}')
+	if [ "$filestatus"x = "M"x ];
+	then
+		test -d ${patch_save}/old/$(dirname $file) || mkdir -p ${patch_save}/old/$(dirname $file)
+		git show ${last_hash}^:$file > ${patch_save}/old/$file
+	fi
+done;
+
+test -f temp.txt && rm temp.txt
+test -f filelist.txt && rm filelist.txt

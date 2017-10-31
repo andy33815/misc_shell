@@ -1,0 +1,24 @@
+share_all="
+All_In_One_20160321
+AutoFtp_Form20160425
+backup_bin
+backup_bin2
+backup_public
+sw_6572_bin2
+sw_6580_bin
+Sw_bin
+Sw_bin2
+sw_bin_6825c
+sw_bin_mtk6571
+sw_bin_mtk6582
+sw_bin_mtk6735
+Tools
+"
+for share in $share_all;
+do
+{
+	sudo mkdir -p /media/60share/$share
+	sudo mount //192.168.0.60/$share /media/60share/$share/ -o username=tst,password=ff
+};
+done;
+

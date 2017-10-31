@@ -1,0 +1,54 @@
+echo "script begin $(date +"%Y/%m/%d %H:%M:%S")"
+workspace_root=/media/E/project
+#workspace=$(find $workspace_root/mtk* -maxdepth 2 -type d -name .git -follow | grep mtk)
+workspace=$(cat project_list)
+rm  success_update_project.txt > /dev/null 2>&1
+rm  error_update_project.txt > /dev/null 2>&1
+for path in $workspace;
+do
+{
+	cd $(dirname $path) > /dev/null 2>&1
+	echo "******** path: $(pwd) begin $(date +"%Y/%m/%d %H:%M:%S") ********"
+	git_branch=$(git branch | grep "\*" | awk -F' ' '{print $2}')
+	echo "git st begin $(date +"%Y/%m/%d %H:%M:%S")"
+	git_need_update=$(git st|grep "working directory clean")
+	echo "git st end $(date +"%Y/%m/%d %H:%M:%S")"
+	git_co_hash=111
+	git_ft_hash=222
+	git_push_result=fail
+
+	if [ -n "$git_need_update" ]; then
+		git_co_hash=$(git log --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+		git_ft_hash=$(git log origin/$git_branch --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+	fi
+
+	git fetch origin > /dev/null 2>&1
+    if [ "$git_co_hash"x = "$git_ft_hash"x ]; then
+		while [ "$git_push_result"x != "success"x ]
+		do
+			git pull origin $git_branch > /dev/null 2>&1
+			git push origin $git_branch > /dev/null 2>&1
+			git_co_hash=$(git log --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+			git_ft_hash=$(git log origin/$git_branch --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+			if [ "$git_co_hash"x = "$git_ft_hash"x ]; then
+				git_push_result=success
+			fi
+		done
+		git clean -fdx > /dev/null 2>&1
+		echo path: $(dirname $path) $(date +"%Y/%m/%d %H:%M:%S") >> $workspace_root/"success_update_project.txt"
+	else
+		echo "***************  $(date +"%Y/%m/%d %H:%M:%S")" >> $workspace_root/"error_update_project.txt"
+		echo path: $(dirname $path)  >> $workspace_root/"error_update_project.txt"
+		echo $(git st) >> $workspace_root/"error_update_project.txt"
+	fi
+	echo "******** path: $(pwd) end $(date +"%Y/%m/%d %H:%M:%S") ********"
+};
+done;
+
+if [ -f $workspace_root/"error_update_project.txt" ]
+  then
+	mutt liu_ps@chinaxuhu.com -s "update_project complete error" -a $workspace_root/"error_update_project.txt" < $workspace_root/"success_update_project.txt" > /dev/null 2>&1
+else
+	mutt liu_ps@chinaxuhu.com -s "update_project complete success" < $workspace_root/"success_update_project.txt" > /dev/null 2>&1
+fi
+echo "script end $(date +"%Y/%m/%d %H:%M:%S")"

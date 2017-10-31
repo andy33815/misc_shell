@@ -1,0 +1,5 @@
+find -maxdepth 1 -type d | grep .\/ | grep -v .\/mediatek | grep -v .\/vendor | grep -v .\/.git | grep -v .\/out | grep -iv .\/sourceInsight | grep -iv .\/pack_out | awk -F'/' '{print $2}' > gitk
+find mediatek -maxdepth 1 -type d | grep mediatek/ | grep -v mediatek/config | grep -v mediatek/custom >> gitk
+find mediatek/config -maxdepth 1 -type d |grep mediatek/config/ | grep -v mediatek/config/v | grep -v mediatek/config/out >> gitk
+find mediatek/custom -maxdepth 1 -type d |grep mediatek/custom/ | grep -v mediatek/custom/v | grep -v mediatek/custom/out >> gitk
+find vendor/mediatek -maxdepth 1 -type d |grep vendor/mediatek/ | grep -v vendor/mediatek/v | grep -v vendor/mediatek/out >> gitk

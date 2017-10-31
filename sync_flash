@@ -1,0 +1,102 @@
+#!/bin/bash
+# we have only 2 arguments. Print the help text: 
+if [ $# -lt 2 ] ; then 
+printf "USAGE: 
+	$0 current_platform_path git_hash
+EXAMPLE: 
+	sync mtk6750_m_2.10_alps/alps/ 1234567 for all 6738 platform: 
+	$0 mtk6750_m_2.10_alps/alps/ 1234567
+HELP 
+"
+exit 0 
+fi
+
+echo "script begin $(date +"%Y/%m/%d %H:%M:%S")"
+mtk6580_group="mtk6580_l_alps/ mtk6580_m_2.34_alps/ mtk6580_n_alps/alps/"
+mtk6735_group="mtk6735_ali3.2.0_21in1/ mtk6735_l_fr_alps/ mtk6735_v2.95_21in1_alps/"
+mtk6737_group="mtk6737_ali5.1.0/alps/ mtk6737_ali5.1.0_cmcc/ mtk6737_m_alps/alps/ mtk6737_n_alps/alps/"
+mtk6738_group="mtk6738_ali5.1.0_cmcc/ mtk6750_m_2.10_alps/alps/ mtk6750_pb5.1.0/alps/"
+local_path=`pwd`
+platform=$(echo $1|awk -F"_" '{print $1}')
+
+echo "project_path=$1, hash=$2,local_path=$local_path"
+echo platform=$platform
+
+current_group=""
+if [ "$platform"x = "mtk6580"x ]; then
+  current_group=$mtk6580_group
+elif [ "$platform"x = "mtk6735"x ]; then
+  current_group=$mtk6735_group
+elif [ "$platform"x = "mtk6737"x ]; then
+  current_group=$mtk6737_group
+elif [ "$platform"x = "mtk6750"x ] || [ "$platform"x = "mtk6738"x ]; then
+  current_group=$mtk6738_group
+else
+  echo "Sorry, parameter error"
+  exit
+fi
+
+cd $1
+MemoryDevice_h=$(git shfile $2 | grep custom_MemoryDevice.h)
+MemoryDeviceList_xls=$(git shfile $2 | grep MemoryDeviceList_)
+commit_msg=$(git lg $2 --pretty=format:'%s' --abbrev-commit | head -1)
+commit_msg=${commit_msg:2}
+
+for path in $current_group;
+do
+{
+	if [ "$path"x != "$1"x ]; then
+		memerypath=""
+		if [ -d $local_path/$path/vendor/mediatek/proprietary/bootable/bootloader/preloader/ ]
+			then
+			memerypath="vendor/mediatek/proprietary/bootable/bootloader/preloader/"
+		elif [ -d $local_path/$path/bootable/bootloader/preloader/ ]
+			then
+			memerypath="bootable/bootloader/preloader/"
+		else
+			echo "error can not find preloader"
+			exit
+		fi
+		echo "####################current path = $local_path/$path"
+		cd $local_path/$path > /dev/null 2>&1
+		git_branch=$(git branch | grep "\*" | awk -F' ' '{print $2}')
+		git fetch > /dev/null 2>&1
+		git pull origin $git_branch > /dev/null 2>&1
+		git push origin $git_branch > /dev/null 2>&1
+		for Device_h in $MemoryDevice_h;
+		do
+		{
+			cp $local_path/$1/$Device_h $memerypath/custom/
+		};
+		done;
+		for DeviceList_xls in $MemoryDeviceList_xls;
+		do
+		{
+			cp $local_path/$1/$DeviceList_xls $memerypath/tools/emigen/MT*/ > /dev/null 2>&1
+		};
+		done;
+
+		git_push_result=fail
+		git_co_hash=$(git log --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+		git_ft_hash=$(git log origin/$git_branch --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+	
+		git fetch origin > /dev/null 2>&1
+		while [ "$git_push_result"x != "success"x ]
+		do
+			git pull origin $git_branch > /dev/null 2>&1
+			git push origin $git_branch > /dev/null 2>&1
+			git_co_hash=$(git log --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+			git_ft_hash=$(git log origin/$git_branch --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+			if [ "$git_co_hash"x = "$git_ft_hash"x ]; then
+				git_push_result=success
+			fi
+		done
+		git add $memerypath/custom/custom_MemoryDevice.h* $memerypath/tools/emigen/MT*/ > /dev/null 2>&1
+		git commit -m "${commit_msg}" > /dev/null 2>&1
+		git-gerrit push origin $git_branch > /dev/null 2>&1
+		git push origin $git_branch > /dev/null 2>&1
+	fi
+};
+done;
+cd $local_path > /dev/null 2>&1
+echo "script end $(date +"%Y/%m/%d %H:%M:%S")"

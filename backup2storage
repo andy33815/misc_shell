@@ -1,0 +1,32 @@
+patch1=/media/backup1/backup_git2/
+patch2=/media/backup2/
+copy_path=""
+mount /dev/sdc1 /media/backup1
+mount /dev/sdc2 /media/backup2
+
+for file in $(ls);
+do
+{
+	if [ -n "$(echo $file | egrep '6580|6572')" ]; then
+		copy_path=$patch1
+	else
+		copy_path=$patch2
+	fi
+	
+	checkfile=$(echo $file | awk -F".git" '{print $1}')
+	filename=""
+	if [ -f ${copy_path}${checkfile}.git_* ]; then
+		filename=$(basename $(ls ${copy_path}${checkfile}.git_*))
+	fi
+	if [ "$filename"x != "$file"x ]; then
+		if [ -n "$filename" ]; then
+			echo rm ${copy_path}${filename}
+			rm ${copy_path}${filename}
+		fi
+		echo "copy $file to $copy_path #####"
+		cp $file ${copy_path}
+	else
+		echo "$file already exist, skip"
+	fi
+};
+done;

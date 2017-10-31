@@ -1,0 +1,10 @@
+#!/bin/sh
+# we have only 2 arguments. Print the help text: 
+
+lcurdir=$(readlink -f .)
+rm ~/.ssh/id_rsa.pub
+ssh-keygen -t rsa
+cp ~/.ssh/id_rsa.pub ~/$USER.pub
+cp ~/.ssh/id_rsa.pub $lcurdir/$USER@`hostname`.pub
+ssh-add
+

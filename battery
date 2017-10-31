@@ -1,0 +1,2 @@
+adb shell dumpsys batterystats > battersystats$1.log
+adb shell  cat /sys/kernel/debug/wakeup_sources >  wakeup_sources$1.log

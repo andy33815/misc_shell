@@ -1,0 +1,9 @@
+filename=$USER@`hostname`.txt
+cat /proc/meminfo | grep MemTotal > $filename
+echo >>$filename
+sudo fdisk -l |grep "Disk /dev/sd" >> $filename
+echo >>$filename
+echo cputotal: $(cat /proc/cpuinfo | grep processor | wc -l) >> $filename
+echo ipaddr: $(ifconfig | grep inet | awk -F":" '{print $2}' | awk '{print $1}' | grep "192.168.") >> $filename
+echo git.user: $(git config --get user.name) >> $filename
+echo ubuntu version: $(cat cat /etc/lsb-release | grep DISTRIB_RELEASE | awk -F'=' '{print $2}') >> $filename

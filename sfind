@@ -1,0 +1,767 @@
+#!/bin/bash
+
+# Kia.Zhu 2012.09
+
+# 打印帮助
+sfind_help(){
+	echo "	
+		【【sfind 命令使用方法】】
+	
+	[特殊功能]
+	- bootimg  
+		更新全志的boot.img,主要更新uImage和ramdiskimg，生成文件目录android4.0/out/target/product/ProductX/boot.img,需要指定boot.img所在的路径
+	- ublogo	
+		更新全志uboot logo，linux.bmp需要放在当前目录下
+	- script  
+		更新全志的脚本配置文件,生成的文件在目录lichee/tools/pack/out/bootfs下，可以再android源码根目录执行pack后直接执行这个命令，或者拷贝到当前目录有script.bin和script0.bin然后再执行
+	- kdb  
+		查看内核Debug信息
+	- log  
+		更新logcat 信息
+	- adbr
+		让设备不断重启，用于设备做重启测试
+	- adbe
+		打印adb报错的信息
+	- ptosd
+		adb push 多文件到sd卡
+	- rmgit
+		删除所有文件夹下面的git
+	- signapp
+		给当前目录下面的apk签名
+	- apk
+		查看apk的标签/包信息
+	- installapp
+		安装目录下面的所有apk文件
+	- help  
+		查看sfind命令使用帮助
+	- replace para1 para2 
+		把当前目录下文件包含para1字符串替换为para2字符串
+	- d para...  
+		查找当前目录下要删除的文件
+	- t para...  
+		查找当前目录下参数指定的日期内更新的文件，参数1指一天前更新的文件，参数10表示10天内更新过的文件
+
+	[Boot Logo 相关, 开机动画]
+	- convert 
+		转换当前目录的jpg文件为png文件
+	- bootlogo 
+		在需要转换的目录下执行，当前目录需要有desc.txt文件和part*目录，执行后会自动打包图片，并且用adb push到机器上去
+	
+	[查找文件]
+	例如：查找*.c文件中包含连续字符串test1 test2,
+		root@local:/home# sfind c test1 test2
+	      前面加z表示全字匹配,查找*.c文件中只含连续字符串test1 
+		root@local:/home# sfind zc test1 
+	- c para...  
+		查找*.c文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zc para...  
+		使用正则表达式查找*.c文件文件里面的字符串，后面跟字符串长度最大为五个
+	- i para...  
+		查找*.itm文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zi para...  
+		使用正则表达式查找*.itm文件文件里面的字符串，后面跟字符串长度最大为五个
+	- sh para...  
+		查找*.sh文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zsh para...  
+		使用正则表达式查找*.sh文件文件里面的字符串，后面跟字符串长度最大为五个
+	- j para...  
+		查找*.java文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zj para...  
+		使用正则表达式查找*.java文件文件里面的字符串，后面跟字符串长度最大为五个
+	- m para...  
+		查找*.mk文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zm para...  
+		使用正则表达式查找*.mk文件文件里面的字符串，后面跟字符串长度最大为五个
+	- x para...  
+		查找*.xml文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zx para...  
+		使用正则表达式查找*.xml文件文件里面的字符串，后面跟字符串长度最大为五个
+	- a para...  
+		查找所有文件里面的字符串，后面跟字符串长度最大为五个
+	- za para...  
+		使用正则表达式查找所有文件里面的字符串，后面跟字符串长度最大为五个
+	- h para...  
+		查找*.h文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zh para...  
+		使用正则表达式查找*.h文件文件里面的字符串，后面跟字符串长度最大为五个
+	- cpp para... 
+		查找*.cpp文件文件里面的字符串，后面跟字符串长度最大为五个
+	- zcpp para... 
+		使用正则表达式查找*.cpp文件文件里面的字符串，后面跟字符串长度最大为五个
+
+		"
+}
+
+
+# 查找文件更新时间
+find_file_modify_time(){
+	echo
+	for file in $(find ./ -mtime "-$STRING")
+	do
+		if [ -f $file ]; then
+			echo	"	$file"
+		fi
+	done
+	echo
+}
+
+# 检查ADB状态
+check_adb_state(){
+	if [ "unknown" = `adb get-state` ]; then
+		echo && echo -e "\033[0;34;5m	 【【【 devices not found, waiting for insert devices ... 】】】 \033[0m"
+		echo ""
+
+		#if [ "adbd is already running as root" = `adb root`]; then
+		#	echo "adb run as root"
+		#fi
+
+	    	while [ "unknown" = `adb get-state` ]
+	    	do
+			sleep 1
+		done
+	fi
+}
+
+# 打印内核消息
+adb_shell_dmesg(){
+	while [ 1 ]
+	do
+		while [ "unknown" = "$(adb get-state)" ] 
+		do
+			sleep 1
+			if [ -f kmsg.txt ]; then
+				rm kmsg.txt
+				echo rm kmsg.txt
+			fi
+		done
+		adb shell cat proc/kmsg >> kmsg.txt
+	done
+}
+
+# 打印上层消息
+adb_shell_logcat(){
+	while [ 1 ]
+	do
+		while [ "unknown" = "$(adb get-state)" ] 
+		do
+			sleep 1
+			if [ -f logcat.txt ]; then
+				rm logcat.txt
+				echo rm logcat.txt
+			fi
+		done
+		adb logcat -v time -b main -b events -b system >> logcat.txt
+	done
+}
+
+adb_reboot_devices(){
+	
+	BOOT_NUM=0
+	adb_result=$(adb shell ls -l /sdcard/ | grep iReader | awk -F' ' '{print $6}')
+	while [ 1 ]
+	do
+		if [ ! -e $adb_result ];then
+			adb shell rm -rf sdcard/mtklog
+			adb shell rm -rf sdcard/mtklog
+			adb reboot
+			BOOTNUM=$(($BOOTNUM+1)) 
+			echo "已重启$BOOTNUM次, 现在的时间是`date`，等待设备重启..."
+		fi
+		sleep 5
+		while [ "unknown" = `adb get-state` ]
+		do
+			sleep 1
+		done
+		adb_result=$(adb shell ls -l /sdcard/ | grep iReader | awk -F' ' '{print $6}')
+	done
+}
+
+# 更新uboot
+update_uboot_logo(){
+	
+	CURRENT_DIR=`pwd`
+	echo && echo "	Update U-boot logo " && echo
+
+	check_adb_state
+
+	if [ -f linux.bmp ]; then
+		adb shell mkdir nanda
+		sleep 1
+
+		echo "	Mounting Nand Part"
+		adb shell mount -t vfat /dev/block/nanda /nanda
+		sleep 1
+		echo "	Replacing linux.bmp"
+		adb push $CURRENT_DIR/linux.bmp /nanda/linux/
+		sleep 1
+		
+		echo "	Update Logo Successful"
+
+		adb reboot
+	else
+		echo "	linux.bmp Not found in current dir"
+		echo
+	fi
+}
+
+# 更新全志的脚本配置文件
+update_allwinner_script(){
+
+	CURRENT_DIR=`pwd`
+	echo && echo -e "\033[0;34;5m	Update Allwinner Script\033[0m"
+
+	if [ -f script.bin ] || [ -f ../lichee/tools/pack/out/bootfs/script.bin ]; then
+
+	    	if [ -f script0.bin ] || [ -f ../lichee/tools/pack/out/bootfs/script0.bin ]; then
+
+			check_adb_state
+
+			if [ "unknown" != `adb get-state` ]; then
+		
+				#adb remount
+				#sleep 1
+				adb shell mkdir nanda
+				sleep 1
+				echo "	pushing script.bin script0.bin to devices" 
+				adb shell mount -t vfat /dev/block/nanda /nanda
+				sleep 1
+
+				if [ -f script.bin ]; then
+					adb push $CURRENT_DIR/script.bin /nanda/
+					adb push $CURRENT_DIR/script0.bin /nanda/
+				else
+					adb push ../lichee/tools/pack/out/bootfs/script.bin /nanda/
+					adb push ../lichee/tools/pack/out/bootfs/script0.bin /nanda/
+				fi
+
+				echo "	Updateing ...	" 
+				sleep 1
+				echo "	Update finish, rebooting. "
+				adb reboot
+
+				echo ""
+				echo "	Update script successful"
+				echo ""
+			fi
+	    	else
+			echo "   【 当前目录没有 script0.bin文件 】"
+			echo ""
+	    	fi
+	else
+		echo "   【 当前目录没有 script.bin 文件 】"
+		echo ""
+
+		exit 0
+	fi
+}
+
+
+# 更新全志的内核
+update_allwinner_bootimg(){
+
+	CURRENT_DIR=`pwd`
+	echo && echo -e "\033[0;34;5m	Update Allwinner Bootimg \033[0m"
+
+	if [ -f $STRING ]; then
+
+	    check_adb_state
+
+	    #while [ 0 ]
+	    #do
+		if [ "unknown" != `adb get-state` ]; then
+		
+			echo "pushing boot.img"
+			chmod 777 $STRING
+			adb push $STRING /mnt/sdcard/
+			sleep 1
+			adb shell dd if=/mnt/sdcard/boot.img of=/dev/block/nandc
+			sleep 1
+			adb reboot
+			echo "push finish."
+
+			echo ""
+			#echo "    【【【 update kernel successful, please insert new device to update 】】】"
+			echo "    【【【 update kernel successful 】】】"
+			echo ""
+		fi
+
+		#while [ "unknown" = `adb get-state` ]
+		#do
+		#	sleep 1
+		#done
+	    #done
+
+	else
+		echo "   【 指定文件不存在 】"
+		echo ""
+
+		exit 0
+	fi
+}
+
+# 查找字符串
+find_string(){
+	if [ "true" == $ZHENGZHI ]; then
+		if [ -e $STRING ]; then
+			find ./ -name "$FILE_TYPE"
+		elif [ -e $STRING_TWO ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -w -nr --color "$STRING"
+		elif [ -e $STRING_THREE ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -w -nr --color "$STRING $STRING_TWO"
+		elif [ -e $STRING_FOUR ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -w -nr --color "$STRING $STRING_TWO $STRING_THREE"
+		elif [ -e $STRING_FIVE ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -w -nr --color "$STRING $STRING_TWO $STRING_THREE $STRING_FOUR"
+		else
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -w -nr --color "$STRING $STRING_TWO $STRING_THREE $STRING_FOUR $STRING_FIVE"
+		fi
+	else
+		if [ -e $STRING ]; then
+			find ./ -name "$FILE_TYPE"
+		elif [ -e $STRING_TWO ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -nr --color "$STRING"
+		elif [ -e $STRING_THREE ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -nr --color "$STRING $STRING_TWO"
+		elif [ -e $STRING_FOUR ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -nr --color "$STRING $STRING_TWO $STRING_THREE"
+		elif [ -e $STRING_FIVE ]; then
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -nr --color "$STRING $STRING_TWO $STRING_THREE $STRING_FOUR"
+		else
+			find ./ -type f -name "$FILE_TYPE" | xargs grep -nr --color "$STRING $STRING_TWO $STRING_THREE $STRING_FOUR $STRING_FIVE"
+		fi
+	fi
+}
+
+# 设置参数
+set_args(){
+	echo	""
+
+	# 如果sfind 后面有两个以上的参数，则执行判断
+	if [ ! -e $STRING ]; then
+	    case "$FILE_TYPE" in
+		"j")FILE_TYPE="*.java";	echo -e "\033[0;34;5m		File Type Is : *.java \033[0m";;
+		"zj")FILE_TYPE="*.java";	echo -e "\033[0;34;5m		File Type Is : *.java \033[0m"; ZHENGZHI="true";;
+		"c")FILE_TYPE="*.c";	echo -e "\033[0;34;5m		File Type Is : *.c \033[0m";;
+		"zc")FILE_TYPE="*.c";	echo -e "\033[0;34;5m		File Type Is : *.c \033[0m"; ZHENGZHI="true";;
+		"cpp")FILE_TYPE="*.cpp";	echo -e "\033[0;34;5m		File Type Is : *.cpp \033[0m";;
+		"zcpp")FILE_TYPE="*.cpp";	echo -e "\033[0;34;5m		File Type Is : *.cpp \033[0m"; ZHENGZHI="true";;
+		"h")FILE_TYPE="*.h";	echo -e "\033[0;34;5m		File Type Is : *.h \033[0m";;
+		"zh")FILE_TYPE="*.h";	echo -e "\033[0;34;5m		File Type Is : *.h \033[0m"; ZHENGZHI="true";;
+		"x")FILE_TYPE="*.xml";	echo -e "\033[0;34;5m		File Type Is : *.xml \033[0m";;
+		"zx")FILE_TYPE="*.xml";	echo -e "\033[0;34;5m		File Type Is : *.xml \033[0m"; ZHENGZHI="true";;
+		"m")FILE_TYPE="*.mk";	echo -e "\033[0;34;5m		File Type Is : *.mk \033[0m";;
+		"zm")FILE_TYPE="*.mk";	echo -e "\033[0;34;5m		File Type Is : *.mk \033[0m"; ZHENGZHI="true";;
+		"i")FILE_TYPE="*.itm";	echo -e "\033[0;34;5m		File Type Is : *.itm \033[0m";;
+		"zi")FILE_TYPE="*.itm";	echo -e "\033[0;34;5m		File Type Is : *.itm \033[0m"; ZHENGZHI="true";;
+		"sh")FILE_TYPE="*.sh";	echo -e "\033[0;34;5m		File Type Is : *.sh \033[0m";;
+		"zsh")FILE_TYPE="*.sh";	echo -e "\033[0;34;5m		File Type Is : *.sh \033[0m"; ZHENGZHI="true";;
+		"s")FILE_TYPE="*.S";	echo -e "\033[0;34;5m		File Type Is : *.S \033[0m";;
+		"zs")FILE_TYPE="*.S";	echo -e "\033[0;34;5m		File Type Is : *.S \033[0m"; ZHENGZHI="true";;
+		"a")FILE_TYPE="*";	echo -e "\033[0;34;5m		File Type Is : * \033[0m";;
+		"za")FILE_TYPE="*";	echo -e "\033[0;34;5m		File Type Is : * \033[0m"; ZHENGZHI="true";;
+		"d")find ./ -name "$STRING" | xargs rm -fr;      exit 0 ;;
+		"replace")sed -i "s/$STRING/$STRING_TWO/g" `grep "$STRING" -rl ./`;      exit 0 ;;
+	    esac
+	fi
+
+	# 判断sfind后面的参数个数，如果是两个，则可能是执行一些特殊的功能
+	if [ ! -e $STRING_FIVE ]; then
+		echo -e "\033[0;34;5m		Find String : $STRING $STRING_TWO $STRING_THREE $STRING_FOUR $FIVE \033[0m"
+	elif [ ! -e $STRING_FOUR ]; then
+		echo -e "\033[0;34;5m		Find String : $STRING $STRING_TWO $STRING_THREE $STRING_FOUR\033[0m"
+	elif [ ! -e $STRING_THREE ]; then
+		echo -e "\033[0;34;5m		Find String : $STRING $STRING_TWO $STRING_THREE\033[0m"
+	elif [ ! -e $STRING_TWO ]; then
+		echo -e "\033[0;34;5m		Find String : $STRING $STRING_TWO\033[0m"
+	elif [ ! -e $STRING ]; then
+		echo -e "\033[0;34;5m		Find String : $STRING \033[0m"
+	elif [ ! -e $FILE_TYPE ]; then
+		case "$FILE_TYPE" in
+			"convert")for i in *; do convert $i `echo $i | sed -e 's/jpg$/png/'`; done;	exit 0 ;;
+			"bootlogo")rm ../bootanimation.zip; zip -0 -r ../bootanimation.zip ./*; chmod 777 ../bootanimation.zip; adb kill-server; adb remount; adb push ../bootanimation.zip system/media/; adb reboot; exit 0;;
+		esac
+		echo -e "\033[44;37;5m              Find File : $FILE_TYPE \033[0m"
+	else
+		echo	"		Input Error!"
+	fi
+
+	echo	""
+}
+
+
+install_application(){
+	check_adb_state
+	for file in $(find ./ -name "*.apk")
+	do
+		if [ -f $file ]; then
+			echo "	Now Install $file"
+			adb install $file
+		fi
+	done
+}
+
+
+sign_application(){
+
+	for file in $(find ./ -name "*.apk")
+	do
+		echo "	Now sign $file"
+		java -jar signapk.jar platform.x509.pem platform.pk8 "$file" "$file-sign"
+	done
+
+
+}
+
+rm_git(){
+	for file in $(sfind .git)
+	do
+		echo "	$file"
+	     rm -r $file
+	done
+}
+
+main_function(){
+	set_args   
+	find_string	
+}
+
+adb_push_file_to_sdcard(){
+	check_adb_state
+
+	for file in $(find ./ -type f -name "*")
+	do
+		adb push $file /mnt/sdcard/
+	done
+}
+
+adb_push_apk_to_system_app(){
+	check_adb_state
+	adb remount
+	adb push $STRING /system/app/
+#	adb reboot
+	exit 0
+}
+
+adb_meminfo(){
+	check_adb_state
+
+	while [ 1 ]
+	do
+		adb shell cat /proc/meminfo
+		echo && echo && echo && echo && echo && echo && echo && echo 
+		sleep 1
+	done
+
+}
+
+adb_connect(){
+	while [ 1 ]
+	do
+		adb devices
+		sleep 1
+	done
+} 
+
+sfind_test(){
+
+# 计算
+if [ 1 != 1 ]; then
+	expr 2 "*" 3
+fi
+
+# 计算文件行数
+if [ 1 != 1 ]; then
+	wc -l package.sh
+	wc -w package.sh
+	wc -c package.sh
+fi
+
+#  指定欲显示的文件内容范围
+if [ 1 != 1 ]; then
+	cut -b5-10 package.sh	
+fi
+
+# 文件类型
+if [ 1 != 1 ]; then
+	file package.sh	
+fi
+
+# 读取用户输入的变量
+if [ 1 != 1 ]; then
+	read KIA_TEST
+	echo $KIA_TEST
+fi
+
+# 获取不包含路径的文件名
+if [ 1 != 1 ]; then
+	basename package.sh
+fi
+
+# 获取不包含文件名的文件路径
+if [ 1 != 1 ]; then
+	dirname package.sh	
+fi
+
+# 获取不包含文件名的文件路径
+if [ 1 != 1 ]; then
+	set
+fi
+
+}
+
+chmod_files(){
+
+	for file in $(find ./ -name "*")
+	do
+		if [ -f $file ]; then
+			echo $file
+			chmod 777 $file
+		fi
+	done
+
+}
+
+adb_caputre_Log(){
+	check_adb_state
+
+	if [ ! -d MSG ]; then
+		mkdir MSG
+	fi
+
+	echo "		Capture bugreport , wait a minute ..."
+	adb bugreport > MSG/bugreport
+	
+	echo "		Capture logcat , wait a minute ..."
+	adb shell logcat -d -v threadtime > MSG/logcat
+	adb shell logcat -d -v threadtime -b main > MSG/logcat_main
+	adb shell logcat -d -v threadtime -b events > MSG/logcat_evnets
+	adb shell logcat -d -v threadtime -b radio > MSG/logcat_radio
+
+	echo "		Capture top , wait a minute ..."
+	adb shell top -n 1 -d 1 -m 30 -t > MSG/top
+	adb shell cat /system/build.prop > MSG/build.prop
+
+	exit 0
+}
+
+refresh_bootlogo(){
+	check_adb_state
+
+	rm ../bootanimation.zip
+	zip -0 -r ../bootanimation.zip ./*
+	chmod 777 ../bootanimation.zip
+	adb kill-server
+	adb remount
+	adb push ../bootanimation.zip system/media/
+	adb reboot
+	exit 0
+}
+
+file_type(){
+
+	for file in $(find ./ -name "*")
+	do
+		if [ -f $file ]; then
+			echo $file
+			file $file	
+		fi
+	done
+}
+adb_get_language(){
+
+	adb shell getprop | grep persist.sys.timezone
+	adb shell getprop | grep persist.sys.country
+	adb shell getprop | grep persist.sys.language
+
+}
+
+adb_get_cali2(){
+	VERSION=`adb shell dmesg | grep stk831x_probe:\ driver | cut -d \: -f 3 | cut -d " " -f 1`
+	echo "驱动版本 ： $VERSION"
+
+	CALI=`adb shell cat /sys/class/input/input2/cali`
+	echo "/sys/class/input/input2/cali = $CALI"
+
+	VALUE=`adb shell cat /sys/class/input/input2/value`
+	echo "/sys/class/input/input2/value = $VALUE"
+
+	ENABLE=`adb shell cat /sys/class/input/input2/enable`
+	echo "/sys/class/input/input2/enable = $ENABLE"
+} 
+
+adb_get_cali4(){
+	VERSION=`adb shell dmesg | grep stk831x_probe:\ driver | cut -d \: -f 3 | cut -d " " -f 1`
+	echo "驱动版本 ： $VERSION"
+
+	CALI=`adb shell cat /sys/class/input/input4/cali`
+	echo "/sys/class/input/input4/cali = $CALI"
+
+	VALUE=`adb shell cat /sys/class/input/input4/value`
+	echo "/sys/class/input/input4/value = $VALUE"
+
+	ENABLE=`adb shell cat /sys/class/input/input4/enable`
+	echo "/sys/class/input/input4/enable = $ENABLE"
+} 
+
+
+get_apk_info(){
+	
+	aapt d badging $STRING | grep package
+	aapt d badging $STRING | grep launchable-activity
+	aapt d badging $STRING | grep label
+}
+
+target_build_variant_as_user_n_all(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n
+}
+
+target_build_variant_as_user_r_android(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r dr 
+}
+
+target_build_variant_as_user_n_lk(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n lk
+}
+
+target_build_variant_as_user_n_k(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n k
+}
+
+target_build_variant_as_user_n_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n bootimage
+}
+
+target_build_variant_as_user_r_lk(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r lk
+}
+
+target_build_variant_as_user_r_k(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r k
+}
+
+target_build_variant_as_user_r_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r bootimage
+}
+
+target_build_variant_as_user_n_lk_k(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n lk k
+}
+
+target_build_variant_as_user_n_lk_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n lk bootimage
+}
+
+target_build_variant_as_user_n_k_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n k bootimage
+}
+
+target_build_variant_as_user_n_lk_k_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  n lk k bootimage
+}
+
+target_build_variant_as_user_r_lk_k(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r lk k
+}
+
+target_build_variant_as_user_r_lk_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r lk bootimage
+}
+
+target_build_variant_as_user_r_k_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r k bootimage
+}
+
+target_build_variant_as_user_r_lk_k_bootimage(){
+	./mk -t -o=TARGET_BUILD_VARIANT=user $STRING  r lk k bootimage
+}
+
+get_app_lib(){
+        check_adb_state
+        for file in $(find ./ -name "*.apk")
+        do
+                if [ -f $file ]; then
+                        echo & echo "  Now Install $file"
+                        adb install $file
+			PACKAGE_CLASS=`aapt d badging $file | grep package | cut -d "'" -f 2`
+			echo "包名: $PACKAGE_CLASS"
+			sleep 1
+			#TESTLOG=`adb shell ls /data/data/$PACKAGE_CLASS/lib`
+			#if [ ! -e $TESTLOG ]; then
+				#echo "	Found Lib, Now Pulling Lib"
+				echo "	Trying Pull Lib"
+				adb pull /data/data/$PACKAGE_CLASS/lib/ lib
+				
+			#fi
+                fi
+        done
+}
+
+FILE_TYPE="$1"
+STRING="$2"
+STRING_TWO="$3"
+STRING_THREE="$4"
+STRING_FOUR="$5"
+STRING_FIVE="$6"
+ZHENGZHI="false"
+
+[ $# = 0 ] && sfind_help && exit 0
+[ $# = 1 ] && [ $1 = "help" ] && sfind_help && exit 0
+[ $# = 1 ] && [ $1 = "filetype" ] && file_type && exit 0
+[ $# = 1 ] && [ $1 = "bootlogo" ] && refresh_bootlogo && exit 0
+[ $# = 1 ] && [ $1 = "kdb" ] && adb_shell_dmesg && exit 0
+[ $# = 1 ] && [ $1 = "log" ] && adb_shell_logcat && exit 0
+[ $# = 1 ] && [ $1 = "connectadb" ] && adb_connect && exit 0
+[ $# = 1 ] && [ $1 = "ublogo" ] && update_uboot_logo && exit 0
+[ $# = 1 ] && [ $1 = "script" ] && update_allwinner_script && exit 0
+[ $# = 1 ] && [ $1 = "adbr" ] && adb_reboot_devices && exit 0
+[ $# = 1 ] && [ $1 = "adbe" ] && adb logcat *:E && exit 0
+[ $# = 1 ] && [ $1 = "installapp" ] && install_application && exit 0
+[ $# = 1 ] && [ $1 = "getapplib" ] && get_app_lib && exit 0
+[ $# = 1 ] && [ $1 = "signapp" ] && sign_application && exit 0
+[ $# = 1 ] && [ $1 = "rmgit" ] && rm_git && exit 0
+[ $# = 1 ] && [ $1 = "ptosd" ] && adb_push_file_to_sdcard && exit 0
+[ $# = 1 ] && [ $1 = "meminfo" ] && adb_meminfo && exit 0
+[ $# = 1 ] && [ $1 = "chmodfile" ] && chmod_files && exit 0
+[ $# = 1 ] && [ $1 = "captureLog" ] && adb_caputre_Log && exit 0
+[ $# = 1 ] && [ $1 = "getprop" ] && adb_get_language && exit 0
+[ $# = 1 ] && [ $1 = "stk2" ] && adb_get_cali2 && exit 0
+[ $# = 1 ] && [ $1 = "stk4" ] && adb_get_cali4 && exit 0
+
+
+[ $# = 1 ] && [ $1 = "test" ] && sfind_test && exit 0
+
+[ $# = 1 ] && [ $1 = "mntf30" ] && mount 192.168.1.135:/home/f30 /mnt/f30 && exit 0
+[ $# = 1 ] && [ $1 = "mntpj1" ] && mount 192.168.1.135:/home/f30/project1 /mnt/project1 && exit 0
+[ $# = 1 ] && [ $1 = "mntpj2" ] && mount 192.168.1.135:/home/f30/project2 /mnt/project2 && exit 0
+[ $# = 1 ] && [ $1 = "mntkwx" ] && mount 192.168.1.12:/home/work /mnt/kangwx && exit 0
+[ $# = 1 ] && [ $1 = "mntttc" ] && mount 192.168.1.17:/home/workspace /mnt/ttc && exit 0
+[ $# = 1 ] && [ $1 = "mntkia" ] && mount 192.168.1.15:/home/workspace /mnt/kiazhu && exit 0
+[ $# = 1 ] && [ $1 = "mntlzb" ] && mount 192.168.1.9:/home/workspace /mnt/lzb && exit 0
+
+[ $# = 1 ] && echo && echo -e "\033[0;34;5m	Find File $1 \033[0m" && echo  && find ./ -name "$1" && exit 0
+
+[ $# = 2 ] && [ $1 = "apk" ] && aapt d badging $2 && exit 0
+[ $# = 2 ] && [ $1 = "apkinfo" ] && get_apk_info && exit 0
+[ $# = 2 ] && [ $1 = "t" ] && find_file_modify_time && exit 0
+[ $# = 2 ] && [ $1 = "adbapk" ] && adb_push_apk_to_system_app && exit 0
+[ $# = 2 ] && [ $1 = "bootimg" ] && update_allwinner_bootimg && exit 0
+[ $# = 2 ] && [ $1 = "ba" ] && target_build_variant_as_user_n_all && exit 0
+[ $# = 2 ] && [ $1 = "brdr" ] && target_build_variant_as_user_r_android && exit 0
+[ $# = 2 ] && [ $1 = "blk" ] && target_build_variant_as_user_n_lk && exit 0
+[ $# = 2 ] && [ $1 = "bk" ] && target_build_variant_as_user_n_k && exit 0
+[ $# = 2 ] && [ $1 = "bbi" ] && target_build_variant_as_user_n_bootimage && exit 0
+[ $# = 2 ] && [ $1 = "brlk" ] && target_build_variant_as_user_r_lk && exit 0
+[ $# = 2 ] && [ $1 = "brk" ] && target_build_variant_as_user_r_k && exit 0
+[ $# = 2 ] && [ $1 = "brbi" ] && target_build_variant_as_user_r_bootimage && exit 0
+[ $# = 2 ] && [ $1 = "blkk" ] && target_build_variant_as_user_n_lk_k && exit 0
+[ $# = 2 ] && [ $1 = "blkbi" ] && target_build_variant_as_user_n_lk_bootimage && exit 0
+[ $# = 2 ] && [ $1 = "bkbi" ] && target_build_variant_as_user_n_k_bootimage && exit 0
+[ $# = 2 ] && [ $1 = "blkkbi" ] && target_build_variant_as_user_n_lk_k_bootimage && exit 0
+[ $# = 2 ] && [ $1 = "brlkk" ] && target_build_variant_as_user_r_lk_k && exit 0
+[ $# = 2 ] && [ $1 = "brlkbi" ] && target_build_variant_as_user_r_lk_bootimage && exit 0
+[ $# = 2 ] && [ $1 = "brkbi" ] && target_build_variant_as_user_r_k_bootimage && exit 0
+[ $# = 2 ] && [ $1 = "brlkkbi" ] && target_build_variant_as_user_r_lk_k_bootimage && exit 0
+
+# 主函数
+main_function
+

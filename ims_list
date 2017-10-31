@@ -1,0 +1,8 @@
+savefile=ims_list.txt
+echo "[volte]" >>$savefile
+grep -r 'config_device_volte_available">true' ./core/res/res/ | cut -d "/" -f 5  >>$savefile
+echo "[vilte]" >>$savefile
+grep -r 'config_device_vt_available">true' ./core/res/res/ | cut -d "/" -f 5  >>$savefile
+echo "[wfc]" >>$savefile
+grep -r 'config_device_wfc_available">true' ./core/res/res/ | cut -d "/" -f 5  >>$savefile
+cat $savefile | less

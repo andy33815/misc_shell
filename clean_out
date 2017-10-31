@@ -1,0 +1,4 @@
+rm -rf ./*/out*/
+rm -rf ./*/*/out*/
+rm -rf ./*/pack_out/
+rm -rf ./*/*/pack_out/

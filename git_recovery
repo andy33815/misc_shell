@@ -1,0 +1,39 @@
+#find -name "*.tgz" -exec tar xvpfz {} -C ./ ';'
+#find -type d -name "*.git" -exec mv {} ./ ';'
+local_path=$(pwd)
+git_path=$(ls | grep .git$ | awk -F".git" '{print $1}')
+for path in $git_path;
+do
+{
+	echo processing $path
+	if [ -n "$(echo $git_path | grep teksun_$path)" ]; then
+		mkdir -p $local_path/$path/alps
+		mkdir -p $local_path/$path/teksun
+		mv $local_path/$path.git $local_path/$path/alps/.git
+		mv $local_path/teksun_$path.git $local_path/$path/teksun/.git
+		cd $local_path/$path/alps
+		sed -i  s/"bare = true"/"bare = false"/g .git/config
+		git reset --hard HEAD
+		git remote rm origin
+		git remote add origin ssh://liupingsheng@218.17.0.82:29418/$path
+		cd $local_path/$path/teksun
+		sed -i  s/"bare = true"/"bare = false"/g .git/config
+		git reset --hard HEAD
+		git remote rm origin
+		git remote add origin ssh://liupingsheng@218.17.0.82:29418/teksun_$path
+	else
+		if [ -f "$local_path/${path}.git/config" ]
+		 then
+			mkdir -p $local_path/$path
+			mv $local_path/$path.git $local_path/$path/.git
+			cd $local_path/$path
+			sed -i  s/"bare = true"/"bare = false"/g .git/config
+			git reset --hard HEAD
+			git remote rm origin
+			git remote add origin ssh://liupingsheng@218.17.0.82:29418/$path
+		fi
+	fi
+};
+done;
+
+

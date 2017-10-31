@@ -1,0 +1,65 @@
+#!/bin/sh
+# we have only 2 arguments. Print the help text: 
+if [ $# -lt 2 ] ; then 
+printf "USAGE: 
+	$0 commit_hash save_path
+EXAMPLE: 
+	get 1234567 commit changed files, and save /media/E/patch: 
+	$0 1234567 /media/E/patch
+HELP 
+"
+exit 0 
+fi
+
+#格式化输出
+RED="\033[0;31m"
+YELLOW="\033[1;33m"
+GREEN="\033[0;32m"
+NO_COLOR="\033[0m"
+BOLD="\033[1m"
+UNDERLINE="\033[4m"
+warn_debug=false
+die() {
+	echo -e "==> ${RED}${@}${NO_COLOR}"
+	exit 1
+}
+
+warn() {
+	if [[ "$warn_debug" = true ]]; then
+		echo -e "==> ${YELLOW}${@}${NO_COLOR}"
+	fi
+}
+
+good() {
+	echo -e "==> ${GREEN}${*}${NO_COLOR}"
+}
+
+
+git_get () 
+{ 
+	local commitId=$1;
+	local rootdir=$(pwd);
+	local path=$2;
+	test -z ${commitId} && return 1;
+	test -z $path && return 1;
+	local name=$(git log -1 $1 --format=%s| sed "s# ##g"| tr ":" "-");
+	path=$path/${name};
+	warn "该指令必须运行在git的主目录上!!!!!!";
+	for file in $(git show ${commitId} --format=%n --name-only  );
+	do
+		#good "$file";
+		test -d ${path}/new/$(dirname $file) || mkdir -p ${path}/new/$(dirname $file);
+		test -d ${path}/old/$(dirname $file) || mkdir -p ${path}/old/$(dirname $file);
+		git show ${commitId}:$file > ${path}/new/$file;
+		git show ${commitId}^:$file > ${path}/old/$file;
+	done;
+	git format-patch -1 ${commitId} -o ${path};
+	git show --format=%n ${commitId} --name-status > ${path}/filelist.txt
+	good "patch补丁文件保存到 ${path}";
+	local REPLY;
+	read -p "打开?[y/n]" REPLY;
+	[ "$REPLY" != "n" ] && nautilus ${path}
+}
+
+
+git_get $1 $2 

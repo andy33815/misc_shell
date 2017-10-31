@@ -1,0 +1,16 @@
+repertory_path="/D/gitserver/ /E/gitserver2/ /F/gitserver3/"
+
+for git_path in $repertory_path;
+do
+{
+	for dir in $(find $git_path -type d -maxdepth 1 -name "*.git" | sort);
+	do
+	{
+		echo "processing $dir"
+		cd $dir
+		git gc
+		cd - > /dev/null 2>&1
+	};
+	done;
+};
+done;

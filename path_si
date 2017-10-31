@@ -1,0 +1,13 @@
+alps/teksunhw_tools
+alps/vendor
+alps/device
+alps/hardware
+alps/build
+alps/bootable
+alps/libcore
+alps/external
+alps/frameworks
+alps/system
+alps/kernel-3.18
+alps/packages
+alps/teksun

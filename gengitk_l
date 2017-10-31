@@ -1,0 +1,27 @@
+project=alibaba
+platform=f
+mtk_platform=mt6735
+
+find -maxdepth 1 -type d | grep .\/ | grep -v .\/device | grep -v .\/vendor | grep -v .\/bootable | grep -v .\/kernel | grep -v .\/.git | grep -v .\/out | grep -iv .\/sourceInsight | grep -iv .\/pack_out | awk -F'/' '{print $2}' > gitk
+
+find device -maxdepth 1 -type d | grep device/ | grep -v device/$project >> gitk
+find device/$project -maxdepth 1 -type d |grep device/$project/ | grep -v device/$project/$platform >> gitk
+
+find vendor -maxdepth 1 -type d | grep vendor/ | grep -v vendor/mediatek >> gitk
+find vendor/mediatek -maxdepth 1 -type d | grep vendor/mediatek/ | grep -v vendor/mediatek/proprietary >> gitk
+find vendor/mediatek/proprietary -maxdepth 1 -type d | grep vendor/mediatek/proprietary/ | grep -v vendor/mediatek/proprietary/custom | grep -v vendor/mediatek/proprietary/trustzone >> gitk
+find vendor/mediatek/proprietary/custom -maxdepth 1 -type d |grep vendor/mediatek/proprietary/custom/ | grep -v vendor/mediatek/proprietary/custom/$platform >> gitk
+
+find bootable -maxdepth 1 -type d | grep bootable/ | grep -v bootable/bootloader >> gitk
+find bootable/bootloader -maxdepth 1 -type d | grep bootable/bootloader/ | grep -v bootable/bootloader/lk | grep -v bootable/bootloader/preloader >> gitk
+find bootable/bootloader/lk -maxdepth 1 -type d | grep bootable/bootloader/lk/ | grep -v bootable/bootloader/lk/target | grep -v bootable/bootloader/lk/project >> gitk
+find bootable/bootloader/lk/target -maxdepth 1 -type d | grep bootable/bootloader/lk/target/ | grep -v bootable/bootloader/lk/target/$platform >> gitk
+find bootable/bootloader/preloader -maxdepth 1 -type d | grep bootable/bootloader/preloader/ | grep -v bootable/bootloader/preloader/custom >> gitk
+find bootable/bootloader/preloader/custom -maxdepth 1 -type d | grep bootable/bootloader/preloader/custom/ | grep -v bootable/bootloader/preloader/custom/$platform >> gitk
+
+find kernel-3.10 -maxdepth 1 -type d | grep kernel-3.10/ | grep -v kernel-3.10/drivers >> gitk
+find kernel-3.10/drivers -maxdepth 1 -type d | grep kernel-3.10/drivers/ | grep -v kernel-3.10/drivers/misc >> gitk
+find kernel-3.10/drivers/misc -maxdepth 1 -type d | grep kernel-3.10/drivers/misc/ | grep -v kernel-3.10/drivers/misc/mediatek >> gitk
+find kernel-3.10/drivers/misc/mediatek -maxdepth 1 -type d | grep kernel-3.10/drivers/misc/mediatek/ | grep -v kernel-3.10/drivers/misc/mediatek/mach >> gitk
+find kernel-3.10/drivers/misc/mediatek/mach -maxdepth 1 -type d | grep kernel-3.10/drivers/misc/mediatek/mach/ | grep -v kernel-3.10/drivers/misc/mediatek/mach/$mtk_platform >> gitk
+find kernel-3.10/drivers/misc/mediatek/mach/$mtk_platform -maxdepth 1 -type d | grep kernel-3.10/drivers/misc/mediatek/mach/$mtk_platform/ | grep -v kernel-3.10/drivers/misc/mediatek/mach/$mtk_platform/$platform >> gitk

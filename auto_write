@@ -1,0 +1,39 @@
+#!/bin/bash
+
+BOOT_NUM=0
+adb_result=$(adb shell ls -l /sdcard/ | grep Android | awk -F' ' '{print $6}')
+test_index=1
+push_result=
+while [ 1 ]
+do
+	if [ ! -e $adb_result ];then
+		adb shell rm -rf /sdcard/*.zip
+		adb push 4K_FF.txt /sdcard/4K_$test_index.zip		
+		adb push 2M_FF.txt /sdcard/2M_$test_index.zip
+		adb push 4M_FF.txt /sdcard/4M_$test_index.zip
+		push_result=$(adb shell ls /sdcard/4M_$test_index.zip |awk '{print $2}' | grep No)
+		while [ -e $push_result ]
+		do
+			test_index=$(($test_index+1))
+			adb push 4K_FF.txt /sdcard/4K_$test_index.zip		
+			adb push 2M_FF.txt /sdcard/2M_$test_index.zip
+			adb push 4M_FF.txt /sdcard/4M_$test_index.zip
+			push_result=$(adb shell ls /sdcard/4M_$test_index.zip |awk '{print $2}' | grep No)
+		done
+	fi
+
+	if [ ! -e $push_result ];then
+		adb reboot
+		BOOTNUM=$(($BOOTNUM+1))
+		push_result=
+		echo "已重启$BOOTNUM次, 现在的时间是`date`，等待设备重启..."
+		sh /home/$USER/Mail/autosend.sh "auto_write已重启$BOOTNUM次" ./
+	fi
+	sleep 5
+	while [ "unknown" = `adb get-state` ]
+	do
+		sleep 1
+	done
+	echo "第$BOOTNUM次重启后开机, 现在的时间是`date`,等待T卡就绪"
+	adb_result=$(adb shell ls -l /sdcard/ | grep Android | awk -F' ' '{print $6}')
+done

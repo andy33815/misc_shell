@@ -1,0 +1,21 @@
+#!/bin/bash
+
+BOOT_NUM=0
+adb_result=$(adb shell ls -l /sdcard/ | grep mtklog | awk -F' ' '{print $6}')
+while [ 1 ]
+do
+	if [ ! -e $adb_result ];then
+		adb shell rm -rf sdcard/mtklog
+		adb shell rm -rf sdcard/mtklog
+		adb reboot
+		BOOTNUM=$(($BOOTNUM+1)) 
+		echo "已重启$BOOTNUM次, 现在的时间是`date`，等待设备重启..."
+	fi
+	sleep 5
+	while [ "unknown" = `adb get-state` ]
+	do
+		sleep 1
+	done
+	echo "第$BOOTNUM次重启后开机, 现在的时间是`date`,等待T卡就绪"
+	adb_result=$(adb shell ls -l /sdcard/ | grep mtklog | awk -F' ' '{print $6}')
+done

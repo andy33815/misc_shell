@@ -1,0 +1,18 @@
+echo "script begin $(date +"%Y/%m/%d %H:%M:%S")"
+workspace_root=/media/E/project
+#workspace=$(find $workspace_root/mtk* -maxdepth 2 -type d -name .git -follow | grep mtk)
+workspace=$(cat project_list)
+
+for path in $workspace;
+do
+{
+	cd $(dirname $path) > /dev/null 2>&1
+	echo "$(dirname $path) $(date +"%Y/%m/%d %H:%M:%S")"
+#	git gc  > /dev/null 2>&1
+#	git clean -fdx
+	git branch -a
+};
+done;
+
+sh /home/$USER/Mail/autosend.sh showbranch $workspace_root
+echo "script end $(date +"%Y/%m/%d %H:%M:%S")"

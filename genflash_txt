@@ -1,0 +1,44 @@
+echo "script begin $(date +"%Y/%m/%d %H:%M:%S")"
+workspace_root=/media/E/project
+#workspace=$(find $workspace_root/mtk* -maxdepth 2 -type d -name .git -follow | grep mtk)
+workspace=$(cat project_list)
+
+for patch in $workspace;
+do
+{
+	patch=$(dirname $patch)
+	memerypatch=""
+	if [ -d $patch/vendor/mediatek/proprietary/bootable/bootloader/preloader/custom ]
+		then
+		memerypatch="vendor/mediatek/proprietary/bootable/bootloader/preloader/custom"
+	fi
+	if [ -d $patch/bootable/bootloader/preloader/custom ]
+		then
+		memerypatch="bootable/bootloader/preloader/custom"
+	fi
+	if [ -d $patch/mediatek/custom ]
+		then
+		memerypatch="mediatek/custom"
+	fi
+	
+	if [ "$memerypatch"x != x ]
+	then
+	{
+		txtname=$(echo $patch | sed s/"\/"/_/g)
+		echo ======================================== > $txtname.txt
+	#	echo platform: $patch >> $txtname.txt
+		for file in $(ls $patch/$memerypatch/custom_MemoryDevice.h.* | sort);
+		do
+		{
+			echo $(echo $file | awk -F"custom_MemoryDevice.h." '{print $2}'): >> $txtname.txt
+			cat $file | grep CS_PART_NUMBER | grep -v "\/\/\#" | awk -F' ' '{print $3}'  >> $txtname.txt
+			echo   >> $txtname.txt
+		};
+		done;
+		echo ======================================== >> $txtname.txt
+		md5sum -b $txtname.txt
+	};
+	fi
+};
+done;
+echo "script end $(date +"%Y/%m/%d %H:%M:%S")"

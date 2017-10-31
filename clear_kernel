@@ -1,0 +1,11 @@
+#!/bin/sh
+# we have only 2 arguments. Print the help text: 
+
+string1=$(dpkg --get-selections | grep linux-image | grep -v deinstall | grep -v "linux-image-3.2.0-70-generic" | awk -F' ' '{print $1}')
+echo sudo apt-get -y remove $string1
+sudo apt-get -y remove $string1
+
+string1=$(dpkg --get-selections | grep linux-headers | grep -v deinstall | grep -v "linux-headers-3.2.0-70" | awk -F' ' '{print $1}')
+echo sudo apt-get -y remove $string1
+sudo apt-get -y remove $string1
+sudo update-grub

@@ -1,0 +1,34 @@
+branch_all=$(git branch -a | awk -F"/" '{print $3}' | egrep -v "master|patch")
+file_list=$(ls vendor/mediatek/proprietary/bootable/bootloader/preloader/custom/custom_MemoryDevice.h.*)
+for branch in $branch_all; do
+{
+	echo enter $branch
+	git clean -fdx
+	git checkout $branch
+
+	rm -rf vendor/mediatek/proprietary/bootable/bootloader/preloader/custom/custom_MemoryDevice.h*
+	git checkout master $file_list
+	git checkout master vendor/mediatek/proprietary/bootable/bootloader/preloader/tools/emigen/MT6580/MemoryDeviceList_MT6580.xls
+	find device/teksun/*/ -name ProjectConfig.mk -exec sed -i  s/"1288_ddr3_discrete"/"8.2die.ddr3.Discrete"/g {} ';'
+	find device/teksun/*/ -name ProjectConfig.mk -exec sed -i  s/"648_ddr3_discrete"/"8.2die.ddr3.Discrete"/g {} ';'
+	find device/teksun/*/ -name ProjectConfig.mk -exec sed -i  s/"644_ddr3_discrete"/"4.1die.ddr3.Discrete"/g {} ';'
+	find device/teksun/*/ -name ProjectConfig.mk -exec sed -i  s/"646_ddr3_discrete"/"6.1die.ddr3.Discrete"/g {} ';'
+	find device/teksun/*/ -name ProjectConfig.mk -exec sed -i  s/"x16_ddr3_discrete"/"16.2die.ddr3.Discrete"/g {} ';'
+	git add .
+	git add -u
+	git commit -m "common: 分离式DDR兼容整理，增加8Gb 单die ddr"
+
+	git fetch origin
+	git_push_result=fail
+	while [ "$git_push_result"x != "success"x ]
+	do
+		git pull origin $branch
+		git push origin $branch
+		git_co_hash=$(git log --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+		git_ft_hash=$(git log origin/$branch --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
+		if [ "$git_co_hash"x = "$git_ft_hash"x ]; then
+			git_push_result=success
+		fi
+	done 
+};
+done

@@ -1,0 +1,14 @@
+adb root
+adb shell procrank -s > procrank.txt
+adb shell ps -t > ps.txt
+adb shell dumpsys gfxinfo > gfxinfo.txt
+adb shell dumpsys meminfo > dumpsysmeminfo.txt
+adb shell cat /proc/meminfo > meminfo.txt
+adb shell cat /proc/zoneinfo > zoneinfo.txt
+adb shell cat /proc/buddyinfo > buddyinfo.txt
+adb shell cat /proc/mali/memory_usage > mali_memory_usage.txt
+adb shell cat /proc/slabinfo > slabinfo.txt
+adb shell cat /proc/mtk_memcfg/slab_traces > slab_traces.txt 
+adb shell cat /sys/module/lowmemorykiller/parameters/adj > adj.txt
+adb shell cat /sys/module/lowmemorykiller/parameters/minfree > minfree.txt
+ 
