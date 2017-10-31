@@ -1,0 +1,35 @@
+#!/bin/bash
+this=$(basename $0)
+echo "$this script begin $(date +"%Y/%m/%d %H:%M:%S")"
+process_index=1
+cmd_arge="$*"
+workspace_root=/media/E/project
+workspace=$(find $workspace_root/mtk* -maxdepth 2 -type d -name .git -follow | grep mtk | sort)
+
+process_main(){
+for dir in $workspace;
+do
+{
+	echo "------------------------------------${process_index} begin"
+	cd $(dirname $dir)  2>&1 > /dev/null
+	echo "Path: $(dirname $dir)"
+	url=$(git remote -v | grep origin | tail -1 | awk '{print $2}')
+	if [ -n "$(echo $url | grep '192.168.1.80')" ]; then
+		new_url=$(echo $url | sed s/"192.168.1.80"/"andy33815.vicp.net"/g)
+		echo git remote set-url origin $new_url
+		git remote set-url origin $new_url
+	else
+		echo url error $url
+	fi
+	echo "------------------------------------${process_index} end"
+	echo ""
+	process_index=$(($process_index+1))
+	cd - 2>&1 > /dev/null
+};
+done;
+}
+
+process_main 2>&1 | tee $workspace_root/${this}_result.txt
+sendmail "$this $* complete"  "$(cat  $workspace_root/${this}_result.txt)"
+test -f  $workspace_root/${this}_result.txt && rm $workspace_root/${this}_result.txt
+echo "$this script end $(date +"%Y/%m/%d %H:%M:%S")"	

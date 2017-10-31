@@ -1,0 +1,9 @@
+mkdir mtk6737_n_alps
+git clone user@192.168.1.99:/media/E/project/mtk6737_n_alps/alps/.git mtk6737_n_alps/alps
+git clone user@192.168.1.99:/media/E/project/mtk6737_n_alps/teksun mtk6737_n_alps/teksun
+cd mtk6737_n_alps/alps
+git remote set-url origin ssh://liupingsheng@andy33815.vicp.net:29418/mtk6737_n_alps
+cd -
+cd mtk6737_n_alps/teksun
+git remote set-url origin ssh://liupingsheng@andy33815.vicp.net:29418/teksun_mtk6737_n_alps
+cd -

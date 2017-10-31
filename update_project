@@ -1,17 +1,21 @@
-echo "script begin $(date +"%Y/%m/%d %H:%M:%S")"
+#!/bin/bash
+this=$(basename $0)
+echo "$this script begin $(date +"%Y/%m/%d %H:%M:%S")"
+process_index=1
+cmd_arge="$*"
 workspace_root=/media/E/project
-#workspace=$(find $workspace_root/mtk* -maxdepth 2 -type d -name .git -follow | grep mtk)
-workspace=$(cat project_list)
-rm  success_update_project.txt > /dev/null 2>&1
-rm  error_update_project.txt > /dev/null 2>&1
+workspace=$(find $workspace_root/mtk* -maxdepth 2 -type d -name .git -follow | grep mtk | sort)
+test -f $workspace_root/success_${this}.txt && rm  $workspace_root/success_${this}.txt
+test -f $workspace_root/error_${this}.txt && rm  $workspace_root/error_${this}.txt
+
 for path in $workspace;
 do
 {
-	cd $(dirname $path) > /dev/null 2>&1
+	cd $(dirname $path) 2>&1 > /dev/null
 	echo "******** path: $(pwd) begin $(date +"%Y/%m/%d %H:%M:%S") ********"
 	git_branch=$(git branch | grep "\*" | awk -F' ' '{print $2}')
 	echo "git st begin $(date +"%Y/%m/%d %H:%M:%S")"
-	git_need_update=$(git st|grep "working directory clean")
+	git_need_update=$(git st|grep "干净的工作区")
 	echo "git st end $(date +"%Y/%m/%d %H:%M:%S")"
 	git_co_hash=111
 	git_ft_hash=222
@@ -22,33 +26,43 @@ do
 		git_ft_hash=$(git log origin/$git_branch --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
 	fi
 
-	git fetch origin > /dev/null 2>&1
+	git fetch origin 2>&1 > /dev/null
     if [ "$git_co_hash"x = "$git_ft_hash"x ]; then
 		while [ "$git_push_result"x != "success"x ]
 		do
-			git pull origin $git_branch > /dev/null 2>&1
-			git push origin $git_branch > /dev/null 2>&1
+			git pull origin $git_branch 2>&1 > /dev/null
+			git push origin $git_branch 2>&1 > /dev/null
 			git_co_hash=$(git log --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
 			git_ft_hash=$(git log origin/$git_branch --date=short --pretty=format:'%h %ci' --abbrev-commit -- | head -1 | cut -c1-7)
 			if [ "$git_co_hash"x = "$git_ft_hash"x ]; then
 				git_push_result=success
 			fi
 		done
-		git clean -fdx > /dev/null 2>&1
-		echo path: $(dirname $path) $(date +"%Y/%m/%d %H:%M:%S") >> $workspace_root/"success_update_project.txt"
+		git clean -fd 2>&1 > /dev/null
+		echo "------------------------------------${process_index} begin" >> $workspace_root/"success_${this}.txt"
+		echo "Path: $(dirname $path) $(date +'%Y/%m/%d %H:%M:%S')" >> $workspace_root/"success_${this}.txt"
+		echo "------------------------------------${process_index} end" >> $workspace_root/"success_${this}.txt"
+		echo "" >> $workspace_root/"success_${this}.txt"
 	else
-		echo "***************  $(date +"%Y/%m/%d %H:%M:%S")" >> $workspace_root/"error_update_project.txt"
-		echo path: $(dirname $path)  >> $workspace_root/"error_update_project.txt"
-		echo $(git st) >> $workspace_root/"error_update_project.txt"
+		echo "------------------------------------${process_index} begin" >> $workspace_root/"error_${this}.txt"
+		echo "Path: $(dirname $path) $(date +'%Y/%m/%d %H:%M:%S')" >> $workspace_root/"error_${this}.txt"
+		echo "$(git st)" >> $workspace_root/"error_${this}.txt"
+		echo "------------------------------------${process_index} end" >> $workspace_root/"error_${this}.txt"
+		echo "" >> $workspace_root/"error_${this}.txt"		
 	fi
 	echo "******** path: $(pwd) end $(date +"%Y/%m/%d %H:%M:%S") ********"
+	process_index=$(($process_index+1))
 };
 done;
 
-if [ -f $workspace_root/"error_update_project.txt" ]
+if [ -f $workspace_root/"error_${this}.txt" ]
   then
-	mutt liu_ps@chinaxuhu.com -s "update_project complete error" -a $workspace_root/"error_update_project.txt" < $workspace_root/"success_update_project.txt" > /dev/null 2>&1
+	sendmail "${this} complete error"  "$(cat ${workspace_root}/error_${this}.txt)" "${workspace_root}/success_${this}.txt" 2>&1 > /dev/null
 else
-	mutt liu_ps@chinaxuhu.com -s "update_project complete success" < $workspace_root/"success_update_project.txt" > /dev/null 2>&1
+	sendmail "${this} complete success" "$(cat ${workspace_root}/success_${this}.txt)" "${workspace_root}/success_${this}.txt" 2>&1 > /dev/null
 fi
-echo "script end $(date +"%Y/%m/%d %H:%M:%S")"
+
+echo "$this script end $(date +"%Y/%m/%d %H:%M:%S")"
+if [ $# -gt 0 ] ; then 
+bash ${workspace_root}/gitcmd git gc
+fi
