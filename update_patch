@@ -1,0 +1,134 @@
+#!/bin/bash
+this=$(basename $0)
+echo "$this script begin $(date +"%Y/%m/%d %H:%M:%S")"
+patch_tag="alps-mp-n1.mp7-V1 MOLY.LR11.W1630.MD.MP.V23.2 SIXTH.CBP.MD.MP5.V28.2"
+dest_path="mtk6750_n_xlj_alps mtk6750_n_xlj_modem mtk6750_n_xlj_modem_c2k"
+tag_index=0
+local_path=`pwd`
+backup_patch="$local_path/origin/"
+
+getlastpos()
+{
+	strToCheck=$1;
+	charToSearch=$2;
+	let pos=`echo "$strToCheck" | awk -F ''$charToSearch'' '{printf "%d", NF}'`
+	echo "$pos"
+}
+
+patch_main()
+{
+	for patch in $patch_tag;
+	do
+	{
+		tag_index=$(($tag_index+1))
+		dest_temp=""
+		if [ "$tag_index" = "1" ]; then
+			dest_temp=$(echo $dest_path | awk '{print $1}')
+		else
+			if [ "$tag_index" = "2" ]; then
+				dest_temp=$(echo $dest_path | awk '{print $2}')
+			else
+				dest_temp=$(echo $dest_path | awk '{print $3}')
+			fi
+		fi
+		pos=$(getlastpos $(ls | grep $patch | tail -1) P)
+		patch_list=`ls $local_path | grep $patch | sort -n -k $pos -t 'P'`
+		
+		if [ -d "$dest_temp" ]; then
+			if [ -n "$patch_list" ]; then
+				cd $dest_temp 2>&1 > /dev/null
+				echo "******** path: $(pwd) begin $(date +"%Y/%m/%d %H:%M:%S") ********"
+				echo -e "patchlist is:\n$patch_list"
+				git_branch=$(git branch | grep "\*" | awk -F' ' '{print $2}')
+				#echo "git st begin $(date +"%Y/%m/%d %H:%M:%S")"
+				git_need_update=$(git st | grep "干净的工作区")
+				#echo "git st end $(date +"%Y/%m/%d %H:%M:%S")"
+				if [ -n "$git_need_update" ]; then
+					if [ "$git_branch" != "patch" ]; then
+						git checkout patch 2>&1 > /dev/null
+						git clean -fdx 2>&1 > /dev/null
+					fi
+					cd $local_path 2>&1 > /dev/null
+					for patch_tmp in $patch_list;
+					do
+					{	
+						patchdir=${patch_tmp%.tar*}
+						mkdir $patchdir
+						tar xvpfz $patch_tmp -C $patchdir 2>&1 > /dev/null
+						if [ -d $patchdir/alps ]; then #is alps
+							mv $patchdir/*.txt $patchdir/alps/
+							cp -rf $patchdir/alps/* $dest_temp/ 2>&1 > /dev/null
+							cd $dest_temp 2>&1 > /dev/null
+							last_index=$(git log --pretty=format:'%s' --abbrev-commit | head -1 | awk -F"P" '{print $NF}' | awk -F")" '{print $1}')
+							current_index=$(echo $patch_tmp | awk -F"P" '{print $NF}' | awk -F")" '{print $1}')
+							check_index=$(($last_index+1))
+							if [ "$current_index" != "$check_index" ]; then
+								echo "error: git lg not matched, last is P$last_index, current is P$current_index"
+								cd - 2>&1 > /dev/null
+								rm -rf $patchdir 2>&1 > /dev/null
+								exit
+							fi
+							if [ -n "$(cat patch_list.txt | grep '^delete')" ]; then
+								cat patch_list.txt | grep "^delete" | awk '{print $2}' | xargs rm -rf
+							fi
+							git add -A 2>&1 > /dev/null
+							git commit -m "patch: $patch_tmp" 2>&1 > /dev/null
+							cd - 2>&1 > /dev/null
+						else
+							cp -rf $patchdir/* $dest_temp/ 2>&1 > /dev/null
+							cd $dest_temp 2>&1 > /dev/null
+							last_index=$(git log --pretty=format:'%s' --abbrev-commit | head -1 | awk -F"P" '{print $NF}' | awk -F")" '{print $1}')
+							current_index=$(echo $patch_tmp | awk -F"P" '{print $NF}' | awk -F")" '{print $1}')
+							check_index=$(($last_index+1))
+							if [ "$current_index" != "$check_index" ]; then
+								echo "error: git lg not matched, last is P$last_index, current is P$current_index"
+								cd - 2>&1 > /dev/null
+								rm -rf $patchdir 2>&1 > /dev/null
+								exit
+							fi
+							database_="$(git st -s | grep "^??" | grep $patch | grep -v "^\.")"
+							if [ -n "$database_" ]; then
+								database=$(echo "$database_" | awk '{print $2}' | xargs dirname | sort -u)
+								for databse_tmp in $database;
+								do
+								{
+									find $databse_tmp/ | grep $patch | xargs rm -rf
+									cp -rf ../$patchdir/$databse_tmp/* $databse_tmp/
+								};
+								done;
+							fi
+							git add -A 2>&1 > /dev/null
+							git commit -m "patch: $patch_tmp" 2>&1 > /dev/null
+							cd - 2>&1 > /dev/null
+						fi
+						rm -rf $patchdir 2>&1 > /dev/null
+						mv $patch_tmp $backup_patch 2>&1 > /dev/null
+					};
+					done;
+				else
+					echo "error: $dest_temp not clean, force stop"
+					exit
+				fi
+				cd $dest_temp 2>&1 > /dev/null
+				if [ -n "$(git remote | grep origin)" ]; then
+					git push origin patch 2>&1 > /dev/null
+				fi
+				echo "******** path: $(pwd) begin $(date +"%Y/%m/%d %H:%M:%S") ********"
+				cd - 2>&1 > /dev/null
+			fi
+		else
+			echo "error: $dest_temp not exist, please check first"
+			exit
+		fi
+	};
+	done;
+}
+
+patch_main | tee $local_path/${this}_log.txt
+error_msg="$(cat $local_path/${this}_log.txt | grep error)"
+if [ -n "$error_msg" ]; then
+sendmail "${this} fail" "$error_msg" $local_path/${this}_log.txt
+else
+sendmail "${this} success" "$(cat $local_path/${this}_log.txt)" $local_path/${this}_log.txt
+fi
+echo "$this script end $(date +"%Y/%m/%d %H:%M:%S")"
